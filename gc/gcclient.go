@@ -16,12 +16,14 @@ import (
 type GarminConnect interface {
 	Login() error
 	NextActivity() *Activity
+	ExportTCX(activityID int64) ([]byte, error)
 }
 
 const userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"
 const ssoURLStr = "https://sso.garmin.com/sso/login?service=https://connect.garmin.com/modern/&webhost=https://connect.garmin.com&source=https://connect.garmin.com/en-US/signin&redirectAfterAccountLoginUrl=https://connect.garmin.com/modern/&redirectAfterAccountCreationUrl=https://connect.garmin.com/modern/&gauthHost=https://sso.garmin.com/sso&locale=en_US&id=gauth-widget&cssUrl=https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css&privacyStatementUrl=//connect.garmin.com/en-US/privacy/&clientId=GarminConnect&rememberMeShown=true&rememberMeChecked=false&createAccountShown=true&openCreateAccount=false&displayNameShown=false&consumeServiceTicket=false&initialFocus=true&embedWidget=false&generateExtraServiceTicket=false&globalOptInShown=true&globalOptInChecked=false&mobile=false&connectLegalTerms=true"
 const legacySessionURLStr = "https://connect.garmin.com/legacy/session"
 const activitySearchURLStr = "https://connect.garmin.com/proxy/activity-search-service-1.2/json/activities"
+const exportTCXURLStr = "https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/%d"
 
 var responseURLRegex = regexp.MustCompile(`\bresponse_url\s*=\s*"([^"]*)"`)
 
@@ -189,13 +191,12 @@ func (gc *garminConnectImpl) getActivities() error {
 		msg, _ := ioutil.ReadAll(resp.Body)
 		return fmt.Errorf("Activity search: unexpected status code : %d: %s", resp.StatusCode, msg)
 	}
-	var activitiesPage activitiesPage
 	decoder := json.NewDecoder(resp.Body)
+	var activitiesPage activitiesPage
 	err = decoder.Decode(&activitiesPage)
 	if err != nil {
 		return err
 	}
-	fmt.Println(activitiesPage.Results.TotalFound)
 	gc.activities = make([]Activity, len(activitiesPage.Results.Activities))
 	idx := 0
 	for _, gcActivityWrapper := range activitiesPage.Results.Activities {
@@ -214,4 +215,20 @@ func (gc *garminConnectImpl) NextActivity() *Activity {
 		return result
 	}
 	return nil
+}
+
+func (gc garminConnectImpl) ExportTCX(activityID int64) ([]byte, error) {
+	exportURL := fmt.Sprintf(exportTCXURLStr, activityID)
+	request, err := http.NewRequest("GET", exportURL, nil)
+	request.Header.Set("User-Agent", userAgent)
+	resp, err := gc.client.Do(request)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := ioutil.ReadAll(resp.Body)
+		return nil, fmt.Errorf("Export TCX: unexpected status code : %d: %s", resp.StatusCode, msg)
+	}
+	return ioutil.ReadAll(resp.Body)
 }

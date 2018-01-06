@@ -15,11 +15,15 @@
 package cmd
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/icalder/gravasync/gc"
+	"github.com/icalder/gravasync/strava"
+
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -31,20 +35,75 @@ var password string
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "gravasync username password",
+	Use:   "gravasync <username> <password>",
 	Short: "Syncs activities from Garmin Connect to Strava, one at a time with prompts",
 	Args: func(cmd *cobra.Command, args []string) error {
-		if username == "" || password == "" {
-			if len(args) < 2 {
-				return errors.New("username and password are required")
+		if viper.GetString("garmin.username") == "" || viper.GetString("garmin.password") == "" {
+			if username == "" || password == "" {
+				if len(args) < 2 {
+					return errors.New("GC username and password are required when not set in config")
+				}
 			}
+		}
+		if username == "" {
+			username = viper.GetString("garmin.username")
+		}
+		if password == "" {
+			password = viper.GetString("garmin.password")
 		}
 		return nil
 	},
 	Run: func(cmd *cobra.Command, args []string) {
+		stravaClient := strava.NewStrava()
+		// Do we have a Strava API access token?
+		if viper.GetString("strava.accessToken") == "" {
+			if err := stravaClient.Authorise(viper.GetString("strava.clientID"), viper.GetString("strava.clientSecret")); err != nil {
+				panic(err)
+			}
+		} else {
+			stravaClient.SetAccessToken(viper.GetString("strava.accessToken"))
+		}
+
 		garminClient := gc.NewGarminConnect(username, password)
-		garminClient.Login()
+		if err := garminClient.Login(); err != nil {
+			panic(err)
+		}
+		if err := activityLoop(stravaClient, garminClient); err != nil {
+			panic(err)
+		}
 	},
+}
+
+func activityLoop(stravaClient strava.Strava, garminClient gc.GarminConnect) error {
+	for {
+		activity := garminClient.NextActivity()
+		fmt.Println(activity)
+		switch choose() {
+		case "y":
+			tcxBytes, err := garminClient.ExportTCX(activity.ID)
+			if err != nil {
+				return err
+			}
+			if err := stravaClient.ImportTCX(activity.Name, false, tcxBytes); err != nil {
+				return err
+			}
+		case "x":
+			return nil
+		}
+	}
+}
+
+func choose() string {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("Upload (y), Skip (n) or Exit (x)?")
+	for scanner.Scan() {
+		input := strings.ToLower(scanner.Text())
+		if input == "y" || input == "n" || input == "x" {
+			return input
+		}
+		fmt.Println("Upload (y), Skip (n) or Exit (x)?")
+	}
+	return "x"
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
