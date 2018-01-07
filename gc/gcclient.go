@@ -41,9 +41,10 @@ type gcActivityWrapper struct {
 }
 
 type gcActivity struct {
-	ID         int64                 `json:"activityId"`
-	Name       string                `json:"activityName"`
-	UploadDate gregorianCalendarTime `json:"uploadDate"`
+	ID              int64                 `json:"activityId"`
+	Name            string                `json:"activityName"`
+	UploadDate      gregorianCalendarTime `json:"uploadDate"`
+	ActivitySummary activitySummary       `json:"activitySummary"`
 }
 
 type gregorianCalendarTime struct {
@@ -53,6 +54,20 @@ type gregorianCalendarTime struct {
 func (g gregorianCalendarTime) goTime() time.Time {
 	millis, _ := strconv.ParseInt(g.Millis, 10, 64)
 	return time.Unix(0, millis*int64(time.Millisecond))
+}
+
+type activitySummary struct {
+	BeginTimestamp gcTimestamp
+	EndTimestamp   gcTimestamp
+}
+
+type gcTimestamp struct {
+	Value string `json:"value"`
+}
+
+func (t gcTimestamp) goTime() time.Time {
+	result, _ := time.Parse(time.RFC3339, t.Value)
+	return result
 }
 
 type gcCookieJar struct {
@@ -202,7 +217,10 @@ func (gc *garminConnectImpl) getActivities() error {
 	for _, gcActivityWrapper := range activitiesPage.Results.Activities {
 		gcActivity := gcActivityWrapper.Activity
 		gc.activities[idx] = Activity{ID: gcActivity.ID,
-			Name: gcActivity.Name, UploadDate: gcActivity.UploadDate.goTime()}
+			Name:       gcActivity.Name,
+			UploadDate: gcActivity.UploadDate.goTime(),
+			StartTime:  gcActivity.ActivitySummary.BeginTimestamp.goTime(),
+			EndTime:    gcActivity.ActivitySummary.EndTimestamp.goTime()}
 		idx++
 	}
 	return nil
