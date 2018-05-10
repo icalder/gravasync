@@ -14,5 +14,5 @@ type Activity struct {
 }
 
 func (act Activity) String() string {
-	return fmt.Sprintf("%d %s %v", act.ID, act.Name, act.StartTime)
+	return fmt.Sprintf("%d %s %v", act.ID, act.Name, act.UploadDate)
 }

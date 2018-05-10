@@ -20,12 +20,12 @@ type GarminConnect interface {
 }
 
 const userAgent = "Mozilla/5.0 (X11; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"
-const ssoURLStr = "https://sso.garmin.com/sso/login?service=https://connect.garmin.com/modern/&webhost=https://connect.garmin.com&source=https://connect.garmin.com/en-US/signin&redirectAfterAccountLoginUrl=https://connect.garmin.com/modern/&redirectAfterAccountCreationUrl=https://connect.garmin.com/modern/&gauthHost=https://sso.garmin.com/sso&locale=en_US&id=gauth-widget&cssUrl=https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css&privacyStatementUrl=//connect.garmin.com/en-US/privacy/&clientId=GarminConnect&rememberMeShown=true&rememberMeChecked=false&createAccountShown=true&openCreateAccount=false&displayNameShown=false&consumeServiceTicket=false&initialFocus=true&embedWidget=false&generateExtraServiceTicket=false&globalOptInShown=true&globalOptInChecked=false&mobile=false&connectLegalTerms=true"
-const legacySessionURLStr = "https://connect.garmin.com/legacy/session"
+
+const ssoURLStr = "https://sso.garmin.com/sso/login?service=https://connect.garmin.com/modern/&webhost=https://connect.garmin.com&source=https://connect.garmin.com/en-US/signin&redirectAfterAccountLoginUrl=https://connect.garmin.com/modern%&redirectAfterAccountCreationUrl=https://connect.garmin.com/modern/&gauthHost=https://sso.garmin.com/sso&locale=en_US&id=gauth-widget&cssUrl=https://static.garmincdn.com/com.garmin.connect/ui/css/gauth-custom-v1.2-min.css&privacyStatementUrl=//connect.garmin.com/en-US/privacy/&clientId=GarminConnect&rememberMeShown=true&rememberMeChecked=false&createAccountShown=true&openCreateAccount=false&displayNameShown=false&consumeServiceTicket=false&initialFocus=true&embedWidget=false&generateExtraServiceTicket=false&generateNoServiceTicket=false&globalOptInShown=true&globalOptInChecked=false&mobile=false&connectLegalTerms=true&locationPromptShown=true#"
 const activitySearchURLStr = "https://connect.garmin.com/proxy/activity-search-service-1.2/json/activities"
 const exportTCXURLStr = "https://connect.garmin.com/modern/proxy/download-service/export/tcx/activity/%d"
 
-var responseURLRegex = regexp.MustCompile(`\bresponse_url\s*=\s*"([^"]*)"`)
+var responseURLRegex = regexp.MustCompile(`\bvar response_url\s*=\s*"([^"]*)"`)
 
 type activitiesPage struct {
 	Results results `json:"results"`
@@ -144,11 +144,6 @@ func (gc *garminConnectImpl) Login() error {
 
 	// Go here to get some session cookies
 	if err = gc.loadPage(responseURL); err != nil {
-		return err
-	}
-
-	// Go here to get JSESSIONID cookie
-	if err = gc.loadPage(legacySessionURLStr); err != nil {
 		return err
 	}
 
